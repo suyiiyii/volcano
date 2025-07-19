@@ -1,0 +1,139 @@
+# ValidatingAdmissionPolicy for JobFlows validation
+# Migrated from pkg/webhooks/admission/jobflows/validate/validate_jobflow.go
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: volcano-jobflows-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["flow.volcano.sh"]
+      apiVersions: ["v1alpha1"]
+      resources: ["jobflows"]
+  variables:
+  - name: flowNames
+    expression: |
+      object.spec.flows.map(flow, flow.name)
+  - name: hasFlows
+    expression: |
+      has(object.spec.flows) && size(object.spec.flows) > 0
+  - name: uniqueFlowNames
+    expression: |
+      size(variables.flowNames) == size(variables.flowNames.unique())
+  validations:
+  # Must have at least one flow
+  - expression: |
+      variables.hasFlows
+    message: "JobFlow must have at least one flow defined"
+  
+  # Flow names must be unique
+  - expression: |
+      !variables.hasFlows || variables.uniqueFlowNames
+    message: "Flow names must be unique within a JobFlow"
+  
+  # Flow names must be valid
+  - expression: |
+      !variables.hasFlows ||
+      object.spec.flows.all(flow,
+        has(flow.name) &&
+        flow.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$') &&
+        size(flow.name) <= 63
+      )
+    message: "Flow names must be valid DNS labels (max 63 chars)"
+  
+  # All dependency targets must exist as flows
+  - expression: |
+      !variables.hasFlows ||
+      object.spec.flows.all(flow,
+        !has(flow.dependsOn) ||
+        !has(flow.dependsOn.targets) ||
+        flow.dependsOn.targets.all(target,
+          variables.flowNames.exists(name, name == target)
+        )
+      )
+    message: "All dependency targets must reference existing flows"
+  
+  # No self-dependencies
+  - expression: |
+      !variables.hasFlows ||
+      object.spec.flows.all(flow,
+        !has(flow.dependsOn) ||
+        !has(flow.dependsOn.targets) ||
+        !flow.dependsOn.targets.exists(target, target == flow.name)
+      )
+    message: "Flows cannot depend on themselves"
+  
+  # Circular dependency detection (basic 2-level check)
+  # This is a simplified version - full DAG validation requires more complex logic
+  - expression: |
+      !variables.hasFlows ||
+      object.spec.flows.all(flowA,
+        !has(flowA.dependsOn) ||
+        !has(flowA.dependsOn.targets) ||
+        flowA.dependsOn.targets.all(targetB,
+          !object.spec.flows.exists(flowB,
+            flowB.name == targetB &&
+            has(flowB.dependsOn) &&
+            has(flowB.dependsOn.targets) &&
+            flowB.dependsOn.targets.exists(targetC, targetC == flowA.name)
+          )
+        )
+      )
+    message: "Circular dependencies detected between flows (2-level check)"
+  
+  # Advanced DAG validation using CEL's list operations
+  # Check that no flow has a path back to itself through dependencies
+  - expression: |
+      !variables.hasFlows ||
+      object.spec.flows.all(flow,
+        !has(flow.dependsOn) ||
+        !has(flow.dependsOn.targets) ||
+        # For each dependency, check if it creates a cycle by traversing the graph
+        flow.dependsOn.targets.all(directDep,
+          # Get all flows that the direct dependency depends on
+          object.spec.flows.filter(f, f.name == directDep).all(depFlow,
+            !has(depFlow.dependsOn) ||
+            !has(depFlow.dependsOn.targets) ||
+            # Check second level dependencies
+            depFlow.dependsOn.targets.all(secondDep,
+              secondDep != flow.name &&
+              # Check third level (simplified)
+              object.spec.flows.filter(f, f.name == secondDep).all(secondDepFlow,
+                !has(secondDepFlow.dependsOn) ||
+                !has(secondDepFlow.dependsOn.targets) ||
+                !secondDepFlow.dependsOn.targets.exists(thirdDep, thirdDep == flow.name)
+              )
+            )
+          )
+        )
+      )
+    message: "Circular dependencies detected in JobFlow (3-level DAG validation)"
+  
+  # Flow template validation
+  - expression: |
+      !variables.hasFlows ||
+      object.spec.flows.all(flow,
+        has(flow.flowTemplate) &&
+        has(flow.flowTemplate.spec) &&
+        has(flow.flowTemplate.spec.tasks) &&
+        size(flow.flowTemplate.spec.tasks) > 0
+      )
+    message: "Each flow must have a valid template with at least one task"
+
+---
+# ValidatingAdmissionPolicyBinding for JobFlows
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: volcano-jobflows-validation-binding
+spec:
+  policyName: volcano-jobflows-validation
+  validationActions: [Warn, Audit]
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["flow.volcano.sh"]
+      apiVersions: ["v1alpha1"]
+      resources: ["jobflows"]

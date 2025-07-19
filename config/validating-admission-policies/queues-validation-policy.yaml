@@ -1,0 +1,117 @@
+# ValidatingAdmissionPolicy for Queues validation  
+# Migrated from pkg/webhooks/admission/queues/validate/validate_queue.go
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: volcano-queues-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE", "DELETE"]
+      apiGroups: ["scheduling.volcano.sh"]
+      apiVersions: ["v1beta1"]
+      resources: ["queues"]
+  paramKind:
+    apiVersion: scheduling.volcano.sh/v1beta1
+    kind: Queue
+  variables:
+  - name: isRootQueue
+    expression: |
+      object.metadata.name == 'root'
+  - name: hasValidWeight
+    expression: |
+      !has(object.spec.weight) || object.spec.weight > 0
+  - name: hasValidCapacity
+    expression: |
+      !has(object.spec.capability) || 
+      object.spec.capability.all(resource, 
+        resource.value.matches('^[0-9]+(\\.[0-9]+)?([KMGTPE]i?)?$')
+      )
+  validations:
+  # CREATE and UPDATE validations
+  - expression: |
+      request.operation == 'DELETE' ||
+      (
+        # Basic field validations
+        variables.hasValidWeight &&
+        variables.hasValidCapacity &&
+        
+        # State validation
+        (!has(object.spec.state) || 
+         ['Open', 'Closed', 'Closing', 'Unknown'].exists(state, state == object.spec.state)) &&
+        
+        # Reclaimable validation  
+        (!has(object.spec.reclaimable) || 
+         object.spec.reclaimable == true || object.spec.reclaimable == false) &&
+        
+        # Deserved validation
+        (!has(object.spec.deserved) ||
+         object.spec.deserved.all(resource,
+           resource.value.matches('^[0-9]+(\\.[0-9]+)?([KMGTPE]i?)?$')
+         )) &&
+        
+        # Allocated validation
+        (!has(object.spec.allocated) ||
+         object.spec.allocated.all(resource,
+           resource.value.matches('^[0-9]+(\\.[0-9]+)?([KMGTPE]i?)?$')
+         )) &&
+         
+        # Guarantee validation
+        (!has(object.spec.guarantee) ||
+         object.spec.guarantee.guarantee.all(resource,
+           resource.value.matches('^[0-9]+(\\.[0-9]+)?([KMGTPE]i?)?$')
+         ))
+      )
+    message: "Queue validation failed: invalid weight, capacity, state, or resource specifications"
+  
+  # Root queue specific validation
+  - expression: |
+      request.operation == 'DELETE' ||
+      !variables.isRootQueue ||
+      (
+        # Root queue cannot have parent
+        (!has(object.spec.parent) || object.spec.parent == '') &&
+        # Root queue should have weight 1
+        (!has(object.spec.weight) || object.spec.weight == 1)
+      )
+    message: "Root queue cannot have a parent and should have weight 1"
+  
+  # Parent validation for non-root queues
+  - expression: |
+      request.operation == 'DELETE' ||
+      variables.isRootQueue ||
+      !has(object.spec.parent) ||
+      (
+        # Parent name format validation
+        object.spec.parent.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$') &&
+        object.spec.parent != object.metadata.name
+      )
+    message: "Queue parent must be a valid name and cannot be self-referential"
+  
+  # DELETE operation validation - placeholder for external validation
+  # Note: This would require external lookup to check for child queues
+  - expression: |
+      request.operation != 'DELETE' ||
+      true  # This validation requires external queue lookup
+    message: "Cannot delete queue with child queues (requires external validation)"
+    messageExpression: |
+      request.operation == 'DELETE' ? 
+      'Deleting queue: ' + object.metadata.name + ' (child queue validation requires external lookup)' :
+      ''
+
+---
+# ValidatingAdmissionPolicyBinding for Queues
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: volcano-queues-validation-binding
+spec:
+  policyName: volcano-queues-validation
+  validationActions: [Warn, Audit]
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE", "DELETE"]
+      apiGroups: ["scheduling.volcano.sh"]
+      apiVersions: ["v1beta1"]
+      resources: ["queues"]

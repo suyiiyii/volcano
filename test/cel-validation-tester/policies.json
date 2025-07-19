@@ -1,0 +1,56 @@
+[
+  {
+    "name": "jobs-positive-minAvailable",
+    "expression": "object.spec.minAvailable >= 0",
+    "message": "job 'minAvailable' must be >= 0",
+    "description": "Validates that job minAvailable is not negative"
+  },
+  {
+    "name": "jobs-maxRetry-validation",
+    "expression": "!has(object.spec.maxRetry) || object.spec.maxRetry >= 0",
+    "message": "'maxRetry' cannot be less than zero",
+    "description": "Validates that maxRetry if present is not negative"
+  },
+  {
+    "name": "jobs-has-tasks",
+    "expression": "size(object.spec.tasks) > 0",
+    "message": "No task specified in job spec",
+    "description": "Ensures job has at least one task"
+  },
+  {
+    "name": "jobs-task-replicas-positive",
+    "expression": "object.spec.tasks.all(task, task.replicas >= 0)",
+    "message": "Task 'replicas' must be >= 0 for all tasks",
+    "description": "Validates that all task replicas are non-negative"
+  },
+  {
+    "name": "jobs-total-replicas-ge-minAvailable",
+    "expression": "variables.totalReplicas >= object.spec.minAvailable",
+    "message": "job 'minAvailable' should not be greater than total replicas in tasks",
+    "description": "Ensures job minAvailable does not exceed total task replicas"
+  },
+  {
+    "name": "jobs-unique-task-names",
+    "expression": "size(variables.taskNames) == size(variables.taskNames.unique())",
+    "message": "Task names must be unique within a job",
+    "description": "Ensures task names are unique"
+  },
+  {
+    "name": "hypernodes-has-members",
+    "expression": "variables.hasMembers",
+    "message": "HyperNode must have at least one member",
+    "description": "Ensures HyperNode has at least one member"
+  },
+  {
+    "name": "jobflows-has-flows",
+    "expression": "variables.hasFlows",
+    "message": "JobFlow must have at least one flow defined",
+    "description": "Ensures JobFlow has at least one flow"
+  },
+  {
+    "name": "jobflows-unique-flow-names",
+    "expression": "size(variables.flowNames) == size(variables.flowNames.unique())",
+    "message": "Flow names must be unique within a JobFlow",
+    "description": "Ensures flow names are unique"
+  }
+]

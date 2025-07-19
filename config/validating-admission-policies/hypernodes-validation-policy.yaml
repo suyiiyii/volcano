@@ -1,0 +1,142 @@
+# ValidatingAdmissionPolicy for HyperNodes validation
+# Migrated from pkg/webhooks/admission/hypernodes/validate/admit_hypernode.go
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: volcano-hypernodes-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["topology.volcano.sh"]
+      apiVersions: ["v1alpha1"]
+      resources: ["hypernodes"]
+  variables:
+  - name: hasMembers
+    expression: |
+      has(object.spec.members) && size(object.spec.members) > 0
+  validations:
+  # Must have at least one member
+  - expression: |
+      variables.hasMembers
+    message: "HyperNode must have at least one member"
+  
+  # Each member must have exactly one selector type
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        has(member.selector) &&
+        [
+          has(member.selector.exactMatch),
+          has(member.selector.regexMatch), 
+          has(member.selector.labelMatch)
+        ].exists(hasSelector, hasSelector == true) &&
+        [
+          has(member.selector.exactMatch),
+          has(member.selector.regexMatch),
+          has(member.selector.labelMatch)
+        ].filter(hasSelector, hasSelector == true).size() == 1
+      )
+    message: "Each member must have exactly one selector type (exactMatch, regexMatch, or labelMatch)"
+  
+  # ExactMatch validation
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        !has(member.selector.exactMatch) ||
+        (
+          has(member.selector.exactMatch.name) &&
+          member.selector.exactMatch.name != '' &&
+          member.selector.exactMatch.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$') &&
+          size(member.selector.exactMatch.name) <= 253
+        )
+      )
+    message: "ExactMatch name must be a valid qualified name (max 253 chars)"
+  
+  # RegexMatch validation  
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        !has(member.selector.regexMatch) ||
+        (
+          has(member.selector.regexMatch.pattern) &&
+          member.selector.regexMatch.pattern != ''
+        )
+      )
+    message: "RegexMatch pattern cannot be empty"
+  
+  # Basic regex pattern validation (CEL doesn't have full regex compilation)
+  # We can do basic checks for common regex errors
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        !has(member.selector.regexMatch) ||
+        (
+          # Basic regex syntax checks
+          !member.selector.regexMatch.pattern.contains('((?') &&
+          !member.selector.regexMatch.pattern.contains('[') != member.selector.regexMatch.pattern.contains(']') &&
+          !member.selector.regexMatch.pattern.contains('\\') || member.selector.regexMatch.pattern.replace('\\\\', '').replace('\\[', '').replace('\\]', '').replace('\\(', '').replace('\\)', '').matches('^[^\\\\]*$')
+        )
+      )
+    message: "RegexMatch pattern appears to have invalid regex syntax"
+  
+  # LabelMatch validation - basic label selector format
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        !has(member.selector.labelMatch) ||
+        has(member.selector.labelMatch.matchLabels) ||
+        has(member.selector.labelMatch.matchExpressions)
+      )
+    message: "LabelMatch must specify either matchLabels or matchExpressions"
+  
+  # MatchLabels validation
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        !has(member.selector.labelMatch) ||
+        !has(member.selector.labelMatch.matchLabels) ||
+        member.selector.labelMatch.matchLabels.all(key, value,
+          key.matches('^[a-z0-9A-Z]([a-z0-9A-Z\\._-]*[a-z0-9A-Z])?$') &&
+          size(key) <= 63 &&
+          size(value) <= 63
+        )
+      )
+    message: "Label keys and values must be valid (max 63 chars, alphanumeric with dots, underscores, hyphens)"
+  
+  # MatchExpressions validation
+  - expression: |
+      !variables.hasMembers ||
+      object.spec.members.all(member,
+        !has(member.selector.labelMatch) ||
+        !has(member.selector.labelMatch.matchExpressions) ||
+        member.selector.labelMatch.matchExpressions.all(expr,
+          has(expr.key) && 
+          expr.key.matches('^[a-z0-9A-Z]([a-z0-9A-Z\\._-]*[a-z0-9A-Z])?$') &&
+          size(expr.key) <= 63 &&
+          has(expr.operator) &&
+          ['In', 'NotIn', 'Exists', 'DoesNotExist'].exists(op, op == expr.operator) &&
+          (
+            (expr.operator == 'Exists' || expr.operator == 'DoesNotExist') ||
+            (has(expr.values) && size(expr.values) > 0)
+          )
+        )
+      )
+    message: "MatchExpressions must have valid key, operator, and values (when required)"
+
+---
+# ValidatingAdmissionPolicyBinding for HyperNodes
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: volcano-hypernodes-validation-binding
+spec:
+  policyName: volcano-hypernodes-validation
+  validationActions: [Warn, Audit]  
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["topology.volcano.sh"]
+      apiVersions: ["v1alpha1"]
+      resources: ["hypernodes"]

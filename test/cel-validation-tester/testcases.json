@@ -1,0 +1,320 @@
+[
+  {
+    "name": "valid-job",
+    "object": {
+      "apiVersion": "batch.volcano.sh/v1alpha1",
+      "kind": "Job",
+      "metadata": {
+        "name": "test-job",
+        "namespace": "default"
+      },
+      "spec": {
+        "minAvailable": 1,
+        "maxRetry": 3,
+        "queue": "default",
+        "tasks": [
+          {
+            "name": "task-1",
+            "replicas": 2,
+            "template": {
+              "spec": {
+                "containers": [
+                  {
+                    "name": "test",
+                    "image": "busybox:1.24"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": true,
+    "description": "Valid job with positive minAvailable and tasks"
+  },
+  {
+    "name": "invalid-job-negative-minAvailable",
+    "object": {
+      "apiVersion": "batch.volcano.sh/v1alpha1",
+      "kind": "Job",
+      "metadata": {
+        "name": "test-job-negative",
+        "namespace": "default"
+      },
+      "spec": {
+        "minAvailable": -1,
+        "queue": "default",
+        "tasks": [
+          {
+            "name": "task-1",
+            "replicas": 1,
+            "template": {
+              "spec": {
+                "containers": [
+                  {
+                    "name": "test",
+                    "image": "busybox:1.24"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid job with negative minAvailable"
+  },
+  {
+    "name": "invalid-job-no-tasks",
+    "object": {
+      "apiVersion": "batch.volcano.sh/v1alpha1",
+      "kind": "Job",
+      "metadata": {
+        "name": "test-job-no-tasks",
+        "namespace": "default"
+      },
+      "spec": {
+        "minAvailable": 1,
+        "queue": "default",
+        "tasks": []
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid job with no tasks"
+  },
+  {
+    "name": "invalid-job-minAvailable-exceeds-replicas",
+    "object": {
+      "apiVersion": "batch.volcano.sh/v1alpha1",
+      "kind": "Job",
+      "metadata": {
+        "name": "test-job-exceeds",
+        "namespace": "default"
+      },
+      "spec": {
+        "minAvailable": 5,
+        "queue": "default",
+        "tasks": [
+          {
+            "name": "task-1",
+            "replicas": 2,
+            "template": {
+              "spec": {
+                "containers": [
+                  {
+                    "name": "test",
+                    "image": "busybox:1.24"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid job where minAvailable exceeds total replicas"
+  },
+  {
+    "name": "invalid-job-duplicate-task-names",
+    "object": {
+      "apiVersion": "batch.volcano.sh/v1alpha1",
+      "kind": "Job",
+      "metadata": {
+        "name": "test-job-duplicates",
+        "namespace": "default"
+      },
+      "spec": {
+        "minAvailable": 1,
+        "queue": "default",
+        "tasks": [
+          {
+            "name": "task-1",
+            "replicas": 1,
+            "template": {
+              "spec": {
+                "containers": [
+                  {
+                    "name": "test",
+                    "image": "busybox:1.24"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "task-1",
+            "replicas": 1,
+            "template": {
+              "spec": {
+                "containers": [
+                  {
+                    "name": "test2",
+                    "image": "busybox:1.24"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid job with duplicate task names"
+  },
+  {
+    "name": "valid-hypernode",
+    "object": {
+      "apiVersion": "topology.volcano.sh/v1alpha1",
+      "kind": "HyperNode",
+      "metadata": {
+        "name": "test-hypernode"
+      },
+      "spec": {
+        "members": [
+          {
+            "selector": {
+              "exactMatch": {
+                "name": "node-1"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": true,
+    "description": "Valid HyperNode with one member"
+  },
+  {
+    "name": "invalid-hypernode-no-members",
+    "object": {
+      "apiVersion": "topology.volcano.sh/v1alpha1",
+      "kind": "HyperNode",
+      "metadata": {
+        "name": "test-hypernode-empty"
+      },
+      "spec": {
+        "members": []
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid HyperNode with no members"
+  },
+  {
+    "name": "valid-jobflow",
+    "object": {
+      "apiVersion": "flow.volcano.sh/v1alpha1",
+      "kind": "JobFlow",
+      "metadata": {
+        "name": "test-jobflow",
+        "namespace": "default"
+      },
+      "spec": {
+        "flows": [
+          {
+            "name": "flow-1",
+            "flowTemplate": {
+              "spec": {
+                "tasks": [
+                  {
+                    "name": "task-1",
+                    "replicas": 1
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "flow-2",
+            "dependsOn": {
+              "targets": ["flow-1"]
+            },
+            "flowTemplate": {
+              "spec": {
+                "tasks": [
+                  {
+                    "name": "task-1",
+                    "replicas": 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": true,
+    "description": "Valid JobFlow with dependency"
+  },
+  {
+    "name": "invalid-jobflow-no-flows",
+    "object": {
+      "apiVersion": "flow.volcano.sh/v1alpha1",
+      "kind": "JobFlow",
+      "metadata": {
+        "name": "test-jobflow-empty",
+        "namespace": "default"
+      },
+      "spec": {
+        "flows": []
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid JobFlow with no flows"
+  },
+  {
+    "name": "invalid-jobflow-duplicate-names",
+    "object": {
+      "apiVersion": "flow.volcano.sh/v1alpha1",
+      "kind": "JobFlow",
+      "metadata": {
+        "name": "test-jobflow-duplicates",
+        "namespace": "default"
+      },
+      "spec": {
+        "flows": [
+          {
+            "name": "flow-1",
+            "flowTemplate": {
+              "spec": {
+                "tasks": [
+                  {
+                    "name": "task-1",
+                    "replicas": 1
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "flow-1",
+            "flowTemplate": {
+              "spec": {
+                "tasks": [
+                  {
+                    "name": "task-2",
+                    "replicas": 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "operation": "CREATE",
+    "expectValid": false,
+    "description": "Invalid JobFlow with duplicate flow names"
+  }
+]
