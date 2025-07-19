@@ -149,11 +149,19 @@ e2e-test-stress: images
 e2e-test-dra: images
 	E2E_TYPE=DRA FEATURE_GATES="DynamicResourceAllocation=true" ./hack/run-e2e-kind.sh
 
+e2e-test-vap-migration: images
+	E2E_TYPE=VAP_MIGRATION FEATURE_GATES="ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true" ./hack/run-e2e-kind.sh
+
 generate-yaml: init manifests
 	./hack/generate-yaml.sh CRD_VERSION=${CRD_VERSION}
 
 generate-charts: init manifests
 	./hack/generate-charts.sh
+
+vap-equivalence-test: 
+	@echo "Running VAP-Webhook equivalence tests locally..."
+	cd test/e2e/vap-migration && go test -v -ginkgo.v -ginkgo.progress \
+		-ginkgo.fail-fast -ginkgo.trace -timeout 60m
 
 release-env:
 	./hack/build-env.sh release
