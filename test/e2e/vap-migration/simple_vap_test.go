@@ -63,7 +63,7 @@ var _ = Describe("Simple VAP Testing", func() {
 
 		It("Should be able to apply Jobs ValidatingAdmissionPolicy", func() {
 			By("Loading Jobs VAP policy from YAML")
-			policyPath := filepath.Join("..", "..", "..", "config", "validating-admission-policies", "jobs-vap.yaml")
+			policyPath := filepath.Join("..", "..", "..", "config", "validating-admission-policies", "jobs-validation-policy.yaml")
 			policyData, err := ioutil.ReadFile(policyPath)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -88,12 +88,12 @@ var _ = Describe("Simple VAP Testing", func() {
 
 		It("Should validate that all VAP policies have correct syntax", func() {
 			policies := []string{
-				"jobs-vap.yaml",
-				"pods-vap.yaml", 
-				"queues-vap.yaml",
-				"podgroups-vap.yaml",
-				"hypernodes-vap.yaml",
-				"jobflows-vap.yaml",
+				"jobs-validation-policy.yaml",
+				"pods-validation-policy.yaml", 
+				"queues-validation-policy.yaml",
+				"podgroups-validation-policy.yaml",
+				"hypernodes-validation-policy.yaml",
+				"jobflows-validation-policy.yaml",
 			}
 
 			for _, policyFile := range policies {

@@ -1,6 +1,6 @@
 # ValidatingAdmissionPolicy for HyperNodes validation
 # Migrated from pkg/webhooks/admission/hypernodes/validate/admit_hypernode.go
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: volcano-hypernodes-validation
@@ -127,7 +127,7 @@ spec:
 
 ---
 # ValidatingAdmissionPolicyBinding for HyperNodes
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
   name: volcano-hypernodes-validation-binding

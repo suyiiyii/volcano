@@ -1,6 +1,6 @@
 # ValidatingAdmissionPolicy for Queues validation  
 # Migrated from pkg/webhooks/admission/queues/validate/validate_queue.go
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: volcano-queues-validation
@@ -10,10 +10,10 @@ spec:
     resourceRules:
     - operations: ["CREATE", "UPDATE", "DELETE"]
       apiGroups: ["scheduling.volcano.sh"]
-      apiVersions: ["v1beta1"]
+      apiVersions: ["v1"]
       resources: ["queues"]
   paramKind:
-    apiVersion: scheduling.volcano.sh/v1beta1
+    apiVersion: scheduling.volcano.sh/v1
     kind: Queue
   variables:
   - name: isRootQueue
@@ -102,7 +102,7 @@ spec:
 
 ---
 # ValidatingAdmissionPolicyBinding for Queues
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
   name: volcano-queues-validation-binding
@@ -113,5 +113,5 @@ spec:
     resourceRules:
     - operations: ["CREATE", "UPDATE", "DELETE"]
       apiGroups: ["scheduling.volcano.sh"]
-      apiVersions: ["v1beta1"]
+      apiVersions: ["v1"]
       resources: ["queues"]

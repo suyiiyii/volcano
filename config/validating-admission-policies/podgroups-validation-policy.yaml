@@ -1,6 +1,6 @@
 # ValidatingAdmissionPolicy for PodGroups validation
 # Migrated from pkg/webhooks/admission/podgroups/validate/validate_podgroup.go
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: volcano-podgroups-validation
@@ -10,7 +10,7 @@ spec:
     resourceRules:
     - operations: ["CREATE"]
       apiGroups: ["scheduling.volcano.sh"]
-      apiVersions: ["v1beta1"]  
+      apiVersions: ["v1"]  
       resources: ["podgroups"]
   paramKind:
     apiVersion: v1
@@ -78,7 +78,7 @@ data:
 
 ---
 # ValidatingAdmissionPolicyBinding for PodGroups
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
   name: volcano-podgroups-validation-binding
@@ -92,5 +92,5 @@ spec:
     resourceRules:
     - operations: ["CREATE"]
       apiGroups: ["scheduling.volcano.sh"]
-      apiVersions: ["v1beta1"]
+      apiVersions: ["v1"]
       resources: ["podgroups"]

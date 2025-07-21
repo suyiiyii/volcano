@@ -1,6 +1,6 @@
 # ValidatingAdmissionPolicy for Jobs validation
 # Migrated from pkg/webhooks/admission/jobs/validate/admit_job.go
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: volcano-jobs-validation
@@ -106,7 +106,7 @@ spec:
 
 ---
 # ValidatingAdmissionPolicyBinding for Jobs
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
   name: volcano-jobs-validation-binding

@@ -1,6 +1,6 @@
 # ValidatingAdmissionPolicy for Pods validation
 # Migrated from pkg/webhooks/admission/pods/validate/admit_pod.go
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: volcano-pods-validation
@@ -50,7 +50,7 @@ data:
 
 ---
 # ValidatingAdmissionPolicyBinding for Pods
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
   name: volcano-pods-validation-binding
