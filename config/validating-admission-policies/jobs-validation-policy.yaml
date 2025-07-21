@@ -1,0 +1,121 @@
+# ValidatingAdmissionPolicy for Jobs validation
+# Migrated from pkg/webhooks/admission/jobs/validate/admit_job.go
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: volcano-jobs-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["batch.volcano.sh"]
+      apiVersions: ["v1alpha1"]
+      resources: ["jobs"]
+  variables:
+  - name: totalReplicas
+    expression: |
+      object.spec.tasks.map(task, task.replicas).sum()
+  - name: taskNames
+    expression: |
+      object.spec.tasks.map(task, task.name)
+  validations:
+  # Basic field validations
+  - expression: |
+      object.spec.minAvailable >= 0
+    message: "job 'minAvailable' must be >= 0"
+  
+  - expression: |
+      !has(object.spec.maxRetry) || object.spec.maxRetry >= 0
+    message: "'maxRetry' cannot be less than zero"
+  
+  - expression: |
+      !has(object.spec.ttlSecondsAfterFinished) || 
+      object.spec.ttlSecondsAfterFinished >= 0
+    message: "'ttlSecondsAfterFinished' cannot be less than zero"
+  
+  # Task structure validation
+  - expression: |
+      size(object.spec.tasks) > 0
+    message: "No task specified in job spec"
+  
+  # Task replicas validation
+  - expression: |
+      object.spec.tasks.all(task, task.replicas >= 0)
+    message: "Task 'replicas' must be >= 0 for all tasks"
+  
+  # Task minAvailable validation
+  - expression: |
+      object.spec.tasks.all(task, 
+        !has(task.minAvailable) || 
+        (task.minAvailable >= 0 && task.minAvailable <= task.replicas)
+      )
+    message: "Task 'minAvailable' must be >= 0 and <= replicas for all tasks"
+  
+  # Total replicas vs job minAvailable
+  - expression: |
+      variables.totalReplicas >= object.spec.minAvailable
+    message: "job 'minAvailable' should not be greater than total replicas in tasks"
+  
+  # Task name uniqueness
+  - expression: |
+      size(variables.taskNames) == size(variables.taskNames.unique())
+    message: "Task names must be unique within a job"
+  
+  # Task name format validation (DNS label)
+  - expression: |
+      object.spec.tasks.all(task, 
+        task.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$') && 
+        size(task.name) <= 63
+      )
+    message: "Task names must be valid DNS labels (lowercase alphanumeric with hyphens, max 63 chars)"
+  
+  # Job name format validation
+  - expression: |
+      object.metadata.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$') &&
+      size(object.metadata.name) <= 253
+    message: "Job name must be a valid qualified name (max 253 chars)"
+  
+  # Pod name length validation (constructed name should be valid)
+  - expression: |
+      object.spec.tasks.all(task,
+        size(object.metadata.name + '-' + task.name + '-0') <= 253
+      )
+    message: "Constructed pod names would exceed maximum length"
+  
+  # Policy validation - validate events and actions exist
+  - expression: |
+      !has(object.spec.policies) || 
+      object.spec.policies.all(policy, 
+        has(policy.event) && has(policy.action)
+      )
+    message: "All policies must specify both event and action"
+  
+  # UPDATE operation specific validations
+  - expression: |
+      request.operation != 'UPDATE' ||
+      (
+        size(object.spec.tasks) == size(oldObject.spec.tasks) &&
+        object.spec.tasks.all(task, task.replicas >= 0) &&
+        object.spec.tasks.all(task,
+          !has(task.minAvailable) || 
+          (task.minAvailable >= 0 && task.minAvailable <= task.replicas)
+        )
+      )
+    message: "Job updates may not add or remove tasks, and must maintain valid replica constraints"
+
+---
+# ValidatingAdmissionPolicyBinding for Jobs
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: volcano-jobs-validation-binding
+spec:
+  policyName: volcano-jobs-validation
+  validationActions: [Warn, Audit]
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["batch.volcano.sh"]
+      apiVersions: ["v1alpha1"]
+      resources: ["jobs"]

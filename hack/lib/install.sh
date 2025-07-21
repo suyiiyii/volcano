@@ -21,14 +21,20 @@ function kind-up-cluster {
   echo "Running kind: [kind create cluster ${CLUSTER_CONTEXT[*]} ${KIND_OPT}]"
   kind create cluster "${CLUSTER_CONTEXT[@]}" ${KIND_OPT}
 
-  echo
-  check-images
+  # Skip image checks and loading for VAP migration tests
+  if [ "${E2E_TYPE}" != "VAP_MIGRATION" ]; then
+    echo
+    check-images
 
-  echo
-  echo "Loading docker images into kind cluster"
-  kind load docker-image ${IMAGE_PREFIX}/vc-controller-manager:${TAG} "${CLUSTER_CONTEXT[@]}"
-  kind load docker-image ${IMAGE_PREFIX}/vc-scheduler:${TAG} "${CLUSTER_CONTEXT[@]}"
-  kind load docker-image ${IMAGE_PREFIX}/vc-webhook-manager:${TAG} "${CLUSTER_CONTEXT[@]}"
+    echo
+    echo "Loading docker images into kind cluster"
+    kind load docker-image ${IMAGE_PREFIX}/vc-controller-manager:${TAG} "${CLUSTER_CONTEXT[@]}"
+    kind load docker-image ${IMAGE_PREFIX}/vc-scheduler:${TAG} "${CLUSTER_CONTEXT[@]}"
+    kind load docker-image ${IMAGE_PREFIX}/vc-webhook-manager:${TAG} "${CLUSTER_CONTEXT[@]}"
+  else
+    echo
+    echo "Skipping image checks and loading for VAP migration testing"
+  fi
 }
 
 # check if the required images exist
@@ -91,6 +97,10 @@ function install-helm {
 
 function install-ginkgo-if-not-exist {
   echo "Checking ginkgo"
+  # Add GOPATH/bin to PATH if not already there
+  if [[ ":$PATH:" != *":$(go env GOPATH)/bin:"* ]]; then
+    export PATH="${PATH}:$(go env GOPATH)/bin"
+  fi
   which ginkgo >/dev/null 2>&1
   if [[ $? -ne 0 ]]; then
     echo "Installing ginkgo ..."

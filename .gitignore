@@ -79,6 +79,12 @@ network_closure.sh
 
 # precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
 /_tmp/
+
+# E2E test logs
+/volcano-e2e-logs/
+
+# Temporary test files
+/tmp/
 /doc_tmp/
 
 # Test artifacts produced by Jenkins jobs

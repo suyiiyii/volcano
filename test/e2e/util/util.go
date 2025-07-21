@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -140,6 +141,7 @@ type Options struct {
 
 var VcClient *vcclient.Clientset
 var KubeClient *kubernetes.Clientset
+var DynamicClient dynamic.Interface
 
 func InitTestContext(o Options) *TestContext {
 	By("Initializing test context")

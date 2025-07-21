@@ -1,0 +1,68 @@
+# ValidatingAdmissionPolicy for Pods validation
+# Migrated from pkg/webhooks/admission/pods/validate/admit_pod.go
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: volcano-pods-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE"]
+      apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  variables:
+  - name: schedulerNames
+    expression: |
+      has(params.data.schedulerNames) ? 
+      params.data.schedulerNames.split(',').map(name, name.trim()) : 
+      ['volcano']
+  validations:
+  # Only validate pods with volcano scheduler
+  - expression: |
+      !(variables.schedulerNames.exists(name, name == object.spec.schedulerName)) ||
+      (
+        # Validate budget annotations if present
+        (!has(object.metadata.annotations) ||
+         !has(object.metadata.annotations['scheduling.volcano.sh/pod-budget']) ||
+         object.metadata.annotations['scheduling.volcano.sh/pod-budget'].matches('^[0-9]+(\.[0-9]+)?[a-zA-Z]*$')) &&
+        
+        (!has(object.metadata.annotations) ||
+         !has(object.metadata.annotations['scheduling.volcano.sh/pod-budget-percent']) ||
+         (object.metadata.annotations['scheduling.volcano.sh/pod-budget-percent'].matches('^[0-9]+(\.[0-9]+)?%?$') &&
+          double(object.metadata.annotations['scheduling.volcano.sh/pod-budget-percent'].replace('%', '')) <= 100.0))
+      )
+    message: "Pod budget annotations must be valid resource quantities or percentages <= 100%"
+
+---
+# ConfigMap for Pods validation parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-pods-validation-params
+  namespace: volcano-system
+data:
+  schedulerNames: "volcano"
+
+---
+# ValidatingAdmissionPolicyBinding for Pods
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: volcano-pods-validation-binding
+spec:
+  policyName: volcano-pods-validation
+  validationActions: [Warn, Audit]
+  paramRef:
+    name: volcano-pods-validation-params
+    namespace: volcano-system
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE"]
+      apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]

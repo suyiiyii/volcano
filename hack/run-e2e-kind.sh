@@ -29,7 +29,12 @@ CLUSTER_NAME=${CLUSTER_NAME:-integration}
 
 export CLUSTER_CONTEXT=("--name" "${CLUSTER_NAME}")
 
-export KIND_OPT=${KIND_OPT:="--config ${VK_ROOT}/hack/e2e-kind-config.yaml"}
+# Use special KIND config for VAP migration testing
+if [ "${E2E_TYPE}" = "VAP_MIGRATION" ]; then
+    export KIND_OPT=${KIND_OPT:="--config ${VK_ROOT}/test/e2e/vap-migration/kind-config.yaml"}
+else
+    export KIND_OPT=${KIND_OPT:="--config ${VK_ROOT}/hack/e2e-kind-config.yaml"}
+fi
 
 
 function install-volcano {
@@ -101,7 +106,9 @@ function generate-log {
 
 # clean up
 function cleanup {
-  uninstall-volcano
+  if [ "${E2E_TYPE}" != "VAP_MIGRATION" ]; then
+    uninstall-volcano
+  fi
 
   echo "Running kind: [kind delete cluster ${CLUSTER_CONTEXT[*]}]"
   kind delete cluster "${CLUSTER_CONTEXT[@]}"
@@ -137,7 +144,12 @@ if [[ -z ${KUBECONFIG+x} ]]; then
     export KUBECONFIG="${HOME}/.kube/config"
 fi
 
-install-volcano
+# Skip volcano installation for VAP migration tests 
+if [ "${E2E_TYPE}" != "VAP_MIGRATION" ]; then
+    install-volcano
+else
+    echo "Skipping volcano installation for VAP migration testing"
+fi
 
 # Run e2e test
 cd ${VK_ROOT}
@@ -181,6 +193,10 @@ case ${E2E_TYPE} in
 "DRA")
     echo "Running dra e2e suite..."
     KUBECONFIG=${KUBECONFIG} GOOS=${OS} ginkgo -v -r --slow-spec-threshold='30s' --progress --focus="DRA E2E Test" ./test/e2e/dra/
+    ;;
+"VAP_MIGRATION")
+    echo "Running VAP migration equivalence e2e suite..."
+    KUBECONFIG=${KUBECONFIG} GOOS=${OS} ginkgo -v -r --slow-spec-threshold='60s' --progress ./test/e2e/vap-migration/
     ;;
 esac
 

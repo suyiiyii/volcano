@@ -1,0 +1,27 @@
+# kind cluster configuration for VAP migration testing
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+featureGates:
+  ValidatingAdmissionPolicy: true
+  MutatingAdmissionPolicy: true
+nodes:
+- role: control-plane
+  image: kindest/node:v1.31.0  # Use K8s v1.31 for stable VAP/MAP support
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        feature-gates: "ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true"
+    controllerManager:
+      extraArgs:
+        feature-gates: "ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true"
+  - |
+    kind: KubeletConfiguration
+    featureGates:
+      ValidatingAdmissionPolicy: true
+      MutatingAdmissionPolicy: true
+- role: worker
+  image: kindest/node:v1.31.0
+- role: worker
+  image: kindest/node:v1.31.0

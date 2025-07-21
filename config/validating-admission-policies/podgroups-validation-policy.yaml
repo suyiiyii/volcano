@@ -1,0 +1,96 @@
+# ValidatingAdmissionPolicy for PodGroups validation
+# Migrated from pkg/webhooks/admission/podgroups/validate/validate_podgroup.go
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: volcano-podgroups-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE"]
+      apiGroups: ["scheduling.volcano.sh"]
+      apiVersions: ["v1"]  
+      resources: ["podgroups"]
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  variables:
+  - name: hasQueue
+    expression: |
+      has(object.spec.queue) && object.spec.queue != ''
+  - name: validMinMember
+    expression: |
+      !has(object.spec.minMember) || object.spec.minMember >= 0
+  - name: validPriorityClass
+    expression: |
+      !has(object.spec.priorityClassName) || 
+      object.spec.priorityClassName.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+  validations:
+  # Basic field validations
+  - expression: |
+      variables.validMinMember
+    message: "PodGroup minMember must be >= 0"
+  
+  - expression: |
+      variables.validPriorityClass
+    message: "PodGroup priorityClassName must be a valid name"
+  
+  # MinResources validation
+  - expression: |
+      !has(object.spec.minResources) ||
+      object.spec.minResources.all(resource,
+        resource.value.matches('^[0-9]+(\\.[0-9]+)?([KMGTPE]i?|m)?$')
+      )
+    message: "PodGroup minResources must contain valid resource quantities"
+  
+  # Queue format validation (basic check)
+  - expression: |
+      !variables.hasQueue ||
+      (
+        object.spec.queue.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$') &&
+        size(object.spec.queue) <= 63
+      )
+    message: "PodGroup queue name must be a valid DNS label"
+  
+  # Placeholder for external queue state validation
+  # Note: The original webhook validates queue existence and state
+  # This requires external lookup which is not supported in CEL
+  - expression: |
+      !variables.hasQueue ||
+      true  # External queue state validation required
+    message: "Queue state validation requires external lookup"
+    messageExpression: |
+      variables.hasQueue ? 
+      'PodGroup references queue: ' + object.spec.queue + ' (state validation requires external lookup)' :
+      'PodGroup does not specify a queue'
+
+---
+# ConfigMap for PodGroups validation parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-podgroups-validation-params
+  namespace: volcano-system
+data:
+  # Add any configuration needed for queue validation
+  defaultQueue: "default"
+
+---
+# ValidatingAdmissionPolicyBinding for PodGroups
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: volcano-podgroups-validation-binding
+spec:
+  policyName: volcano-podgroups-validation
+  validationActions: [Warn, Audit]
+  paramRef:
+    name: volcano-podgroups-validation-params
+    namespace: volcano-system
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE"]
+      apiGroups: ["scheduling.volcano.sh"]
+      apiVersions: ["v1"]
+      resources: ["podgroups"]
