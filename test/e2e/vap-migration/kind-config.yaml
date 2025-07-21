@@ -6,12 +6,17 @@ featureGates:
   MutatingAdmissionPolicy: true
 nodes:
 - role: control-plane
-  image: kindest/node:v1.32.0  # Ensure K8s v1.32+ for VAP support
+  image: kindest/node:v1.30.0  # Use stable K8s v1.30 for VAP support
   kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        feature-gates: "ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true"
   - |
     kind: ClusterConfiguration
     apiServer:
-        extraArgs:
-          feature-gates: "ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true"
+      extraArgs:
+        feature-gates: "ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true"
 - role: worker
 - role: worker

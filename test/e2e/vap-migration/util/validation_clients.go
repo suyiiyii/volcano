@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
 	vcclient "volcano.sh/apis/pkg/client/clientset/versioned"
@@ -120,22 +122,21 @@ func (w *WebhookTestClient) ValidatePod(namespace string, podSpec interface{}) (
 
 // VAPTestClient manages VAP-specific testing
 type VAPTestClient struct {
-	kubeClient kubernetes.Interface
+	kubeClient    kubernetes.Interface
+	dynamicClient dynamic.Interface
 }
 
 // NewVAPTestClient creates a new VAP test client
-func NewVAPTestClient(kubeClient kubernetes.Interface) *VAPTestClient {
+func NewVAPTestClient(kubeClient kubernetes.Interface, dynamicClient dynamic.Interface) *VAPTestClient {
 	return &VAPTestClient{
-		kubeClient: kubeClient,
+		kubeClient:    kubeClient,
+		dynamicClient: dynamicClient,
 	}
 }
 
 // ValidateJob validates a job using VAP validation (with VAP enabled, webhooks disabled)
 func (v *VAPTestClient) ValidateJob(namespace string, jobSpec *v1alpha1.JobSpec) (*ValidationResult, error) {
 	startTime := time.Now()
-	
-	// Temporarily disable webhook for this test
-	// This would require webhook configuration management
 	
 	// Create job object for validation
 	job := &v1alpha1.Job{
@@ -160,12 +161,17 @@ func (v *VAPTestClient) ValidateJob(namespace string, jobSpec *v1alpha1.JobSpec)
 	unstruct := &unstructured.Unstructured{Object: jobUnstructured}
 	
 	// Create with dry-run=server to trigger VAP validation
-	gvr := v1alpha1.SchemeGroupVersion.WithResource("jobs")
-	_, err = v.kubeClient.RESTClient().Post().
-		AbsPath("/api", gvr.Group, gvr.Version, "namespaces", namespace, gvr.Resource).
-		Param("dryRun", metav1.DryRunAll).
-		Body(unstruct).
-		Do(context.Background()).Get()
+	gvr := schema.GroupVersionResource{
+		Group:    "batch.volcano.sh",
+		Version:  "v1alpha1",
+		Resource: "jobs",
+	}
+	
+	_, err = v.dynamicClient.Resource(gvr).Namespace(namespace).Create(
+		context.Background(), 
+		unstruct, 
+		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+	)
 
 	result := &ValidationResult{
 		Latency: time.Since(startTime),

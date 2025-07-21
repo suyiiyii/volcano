@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -34,5 +35,9 @@ func TestMain(m *testing.M) {
 	config, _ := clientcmd.BuildConfigFromFlags(e2eutil.MasterURL(), configPath)
 	e2eutil.VcClient = vcclient.NewForConfigOrDie(config)
 	e2eutil.KubeClient = kubernetes.NewForConfigOrDie(config)
+	
+	// Initialize dynamic client for VAP testing
+	e2eutil.DynamicClient = dynamic.NewForConfigOrDie(config)
+	
 	os.Exit(m.Run())
 }

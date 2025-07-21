@@ -17,7 +17,6 @@ limitations under the License.
 package vapmigration
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -41,7 +40,7 @@ var _ = Describe("VAP-Webhook Equivalence Testing", func() {
 		ctx = e2eutil.InitTestContext(e2eutil.Options{})
 		
 		webhookClient = util.NewWebhookTestClient(e2eutil.KubeClient, e2eutil.VcClient)
-		vapClient = util.NewVAPTestClient(e2eutil.KubeClient)
+		vapClient = util.NewVAPTestClient(e2eutil.KubeClient, e2eutil.DynamicClient)
 		comparisonEngine = util.NewComparisonEngine(true) // strict mode
 		metricsCollector = util.NewMetricsCollector()
 	})
@@ -131,7 +130,7 @@ var _ = Describe("VAP-Webhook Equivalence Testing", func() {
 			By("Comparing P95 latencies")
 			webhookP95 := results.WebhookLatency.P95()
 			vapP95 := results.VAPLatency.P95()
-			tolerance := webhookP95 * 0.1 // 10% tolerance
+			tolerance := time.Duration(float64(webhookP95) * 0.1) // 10% tolerance
 			
 			Expect(vapP95).To(BeNumerically("~", webhookP95, tolerance),
 				fmt.Sprintf("VAP P95 latency (%v) should be within 10%% of webhook P95 (%v)", vapP95, webhookP95))
