@@ -152,6 +152,9 @@ e2e-test-dra: images
 e2e-test-vap-migration: images
 	E2E_TYPE=VAP_MIGRATION FEATURE_GATES="ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true" ./hack/run-e2e-kind.sh
 
+e2e-test-vap-migration-no-images:
+	E2E_TYPE=VAP_MIGRATION FEATURE_GATES="ValidatingAdmissionPolicy=true,MutatingAdmissionPolicy=true" ./hack/run-e2e-kind.sh
+
 generate-yaml: init manifests
 	./hack/generate-yaml.sh CRD_VERSION=${CRD_VERSION}
 

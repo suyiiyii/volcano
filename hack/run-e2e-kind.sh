@@ -106,7 +106,9 @@ function generate-log {
 
 # clean up
 function cleanup {
-  uninstall-volcano
+  if [ "${E2E_TYPE}" != "VAP_MIGRATION" ]; then
+    uninstall-volcano
+  fi
 
   echo "Running kind: [kind delete cluster ${CLUSTER_CONTEXT[*]}]"
   kind delete cluster "${CLUSTER_CONTEXT[@]}"
@@ -142,7 +144,12 @@ if [[ -z ${KUBECONFIG+x} ]]; then
     export KUBECONFIG="${HOME}/.kube/config"
 fi
 
-install-volcano
+# Skip volcano installation for VAP migration tests 
+if [ "${E2E_TYPE}" != "VAP_MIGRATION" ]; then
+    install-volcano
+else
+    echo "Skipping volcano installation for VAP migration testing"
+fi
 
 # Run e2e test
 cd ${VK_ROOT}
